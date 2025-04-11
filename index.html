@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Учебный взлом -- уровень за уровнем</title>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: monospace;
+      padding: 20px;
+    }
+    .section {
+      border: 1px solid #333;
+      padding: 15px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .section.active {
+      display: block;
+    }
+    input, textarea, button {
+      background: #222;
+      color: #eee;
+      border: 1px solid #444;
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+    }
+    h2 { color: #0ff; }
+    .output { color: #0f0; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h1>Этап 1: SQL-инъекция</h1>
+<div class="section active" id="step1">
+  <form onsubmit="checkSQL(event)">
+    <input type="text" id="sqlUser" placeholder="Имя пользователя">
+    <input type="password" id="sqlPass" placeholder="Пароль">
+    <button>Войти</button>
+  </form>
+  <div class="output" id="sqlOut"></div>
+</div>
+
+<div class="section" id="step2">
+  <h2>Этап 2: XSS отражённая</h2>
+  <form onsubmit="checkXSS(event)">
+    <input type="text" id="xssInput" placeholder="Введи XSS-скрипт">
+    <button>Отправить</button>
+  </form>
+  <div class="output" id="xssOut"></div>
+</div>
+
+<div class="section" id="step3">
+  <h2>Этап 3: XSS хранимая</h2>
+  <textarea id="xssStore" placeholder="Оставь комментарий..."></textarea>
+  <button onclick="storeComment()">Сохранить</button>
+  <div class="output" id="storedComments"></div>
+</div>
+
+<div class="section" id="step4">
+  <h2>Этап 4: Загрузка файла</h2>
+  <form id="uploadForm">
+    <input type="file" id="fileInput">
+    <button>Загрузить</button>
+  </form>
+  <div class="output" id="uploadOut"></div>
+</div>
+
+<div class="section" id="step5">
+  <h2>Этап 5: Directory Traversal</h2>
+  <form onsubmit="checkTraversal(event)">
+    <input type="text" id="traversalInput" placeholder="../../etc/passwd">
+    <button>Открыть</button>
+  </form>
+  <div class="output" id="traversalOut"></div>
+</div>
+
+<script>
+  // Переход к следующему этапу
+  function goToStep(stepId) {
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    document.getElementById(stepId).classList.add("active");
+    window.scrollTo(0, 0);
+  }
+
+  // Этап 1: SQL Injection
+  function checkSQL(e) {
+    e.preventDefault();
+    const u = document.getElementById("sqlUser").value;
+    const p = document.getElementById("sqlPass").value;
+    if (u === "' OR '1'='1" && p === "' OR '1'='1") {
+      document.getElementById("sqlOut").innerHTML = "Успех! Добро пожаловать.";
+      setTimeout(() => goToStep("step2"), 1000);
+    } else {
+      document.getElementById("sqlOut").innerText = "Ошибка входа.";
+    }
+  }
+
+  // Этап 2: Reflected XSS
+  function checkXSS(e) {
+    e.preventDefault();
+    const input = document.getElementById("xssInput").value;
+    document.getElementById("xssOut").innerHTML = "Результат: " + input;
+    if (input.includes("<script>") || input.includes("onerror")) {
+      setTimeout(() => goToStep("step3"), 1000);
+    }
+  }
+
+  // Этап 3: Stored XSS
+  function storeComment() {
+    const comment = document.getElementById("xssStore").value;
+    let prev = localStorage.getItem("xss_comments") || "";
+    const newComment = `<div>${comment}</div>`;
+    const updated = prev + newComment;
+    localStorage.setItem("xss_comments", updated);
+    loadComments();
+  }
+
+  function loadComments() {
+    const stored = localStorage.getItem("xss_comments") || "";
+    const container = document.getElementById("storedComments");
+    container.innerHTML = stored;
+
+    // Автоматический переход если XSS сработал
+    // Ждём, что скрипт вызовет `xssLevelComplete()`
+    setTimeout(() => {
+      if (stored.includes("<script>") || stored.includes("onerror")) {
+        // Примитивная проверка, сработал ли скрипт
+        goToStep("step4");
+      }
+    }, 2000);
+  }
+
+  // Этап 4: File Upload
+  document.getElementById("uploadForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const file = document.getElementById("fileInput").files[0];
+    if (file) {
+      document.getElementById("uploadOut").innerText = "Файл загружен: " + file.name;
+      setTimeout(() => goToStep("step5"), 1000);
+    } else {
+      document.getElementById("uploadOut").innerText = "Выберите файл.";
+    }
+  });
+
+  // Этап 5: Directory Traversal
+  function checkTraversal(e) {
+    e.preventDefault();
+    const input = document.getElementById("traversalInput").value;
+    if (input.includes("../")) {
+      document.getElementById("traversalOut").innerText = "Открыт файл: " + input + "\nroot:x:0:0";
+    } else {
+      document.getElementById("traversalOut").innerText = "Файл не найден.";
+    }
+  }
+
+  // Автоматический переход от XSS (если выполнен скрипт)
+  window.xssLevelComplete = function() {
+    goToStep("step4");
+  }
+
+  // Автозагрузка комментариев при загрузке страницы
+  loadComments();
+</script>
+</body>
+</html>
