@@ -66,7 +66,6 @@
 
 <h1>Взломай все уровни!</h1>
 
-<!-- Уровни -->
 <div class="section active" id="step1">
   <h2>Этап 1: SQL-инъекция</h2>
   <form onsubmit="checkSQL(event)">
@@ -118,6 +117,7 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // Этап 1
   function checkSQL(e) {
     e.preventDefault();
     const u = document.getElementById("sqlUser").value;
@@ -130,6 +130,7 @@
     }
   }
 
+  // Этап 2
   function checkXSS(e) {
     e.preventDefault();
     const input = document.getElementById("xssInput").value;
@@ -139,24 +140,25 @@
     }
   }
 
+  // Этап 3 (без сохранения на устройстве)
+  let comments = "";
+
   function storeComment() {
     const comment = document.getElementById("xssStore").value;
-    let prev = localStorage.getItem("xss_comments") || "";
-    const newComment = `<div>${comment}</div>`;
-    const updated = prev + newComment;
-    localStorage.setItem("xss_comments", updated);
+    comments += `<div>${comment}</div>`;
     loadComments();
   }
 
   function loadComments() {
-    const stored = localStorage.getItem("xss_comments") || "";
     const container = document.getElementById("storedComments");
-    container.innerHTML = stored;
-    if (stored.includes("<script>") || stored.includes("onerror")) {
+    container.innerHTML = comments;
+
+    if (comments.includes("<script>") || comments.includes("onerror")) {
       setTimeout(() => goToStep("step4"), 1500);
     }
   }
 
+  // Этап 4
   document.getElementById("uploadForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const file = document.getElementById("fileInput").files[0];
@@ -168,6 +170,7 @@
     }
   });
 
+  // Этап 5
   function checkTraversal(e) {
     e.preventDefault();
     const input = document.getElementById("traversalInput").value;
@@ -178,11 +181,10 @@
     }
   }
 
+  // Для XSS вызова перехода
   window.xssLevelComplete = function() {
     goToStep("step4");
   }
-
-  loadComments();
 </script>
 
 </body>
